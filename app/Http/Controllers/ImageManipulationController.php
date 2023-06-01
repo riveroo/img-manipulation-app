@@ -7,6 +7,7 @@ use App\Http\Requests\StoreImageManipulationRequest;
 use App\Http\Requests\UpdateImageManipulationRequest;
 use App\Http\Resources\V1\ImageManupulationResource;
 use App\Models\Album;
+use Illuminate\Http\Request;
 use Intervention\Image\Facades\Image;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File ;
@@ -20,13 +21,16 @@ class ImageManipulationController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        return ImageManupulationResource::collection(ImageManipulation::paginate());
+        return ImageManupulationResource::collection(ImageManipulation::where('user_id',$request->user()->id)->paginate());
     }
 
-    public function byAlbum(Album $album)
+    public function byAlbum(Request $request,Album $album)
     {
+        if ($request->user()->id != $album->user_id) {
+            return abort(403,'unauthorize request');
+        }
         $where = [
             'album_id' => $album->id
         ];
@@ -41,6 +45,7 @@ class ImageManipulationController extends Controller
      */
     public function resize(StoreImageManipulationRequest $request)
     {
+
         $all = $request->all();
 
         $image = $all['image'];
@@ -49,11 +54,15 @@ class ImageManipulationController extends Controller
         $data = [
             'type' => ImageManipulation::TYPE_RESIZE,
             'data' => json_encode($all),
-            'user_id' => null,
+            'user_id' => $request->user()->id,
         ];
 
         if (isset($all['album_id'])) {
-            //TODO
+            $album = Album::find($all['album_id']);
+            
+            if ($request->user()->id != $album->user_id) {
+                return abort(403,'unauthorize request');
+            }
 
             $data['album_id']= $all['album_id'];
 
@@ -114,8 +123,11 @@ class ImageManipulationController extends Controller
      * @param  \App\Models\ImageManipulation  $imageManipulation
      * @return \Illuminate\Http\Response
      */
-    public function show(ImageManipulation $image)
+    public function show(Request $request,ImageManipulation $image)
     {
+        if ($request->user()->id != $image->user_id) {
+            return abort(403,'unauthorize request');
+        }
         return new ImageManupulationResource($image);
     }
 
@@ -126,8 +138,11 @@ class ImageManipulationController extends Controller
      * @param  \App\Models\ImageManipulation  $imageManipulation
      * @return \Illuminate\Http\Response
      */
-    public function destroy(ImageManipulation $image)
+    public function destroy(Request $request,ImageManipulation $image)
     {
+        if ($request->user()->id != $image->user_id) {
+            return abort(403,'unauthorize request');
+        }
         $image->delete();
         return response()->json([
             'status' => 'image has been deleted',
